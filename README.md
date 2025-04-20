@@ -1,0 +1,3 @@
+- BINANCE DOCS: https://developers.binance.com/docs/binance-spot-api-docs/README
+- BINANCE SPOT TESTNET: https://testnet.binance.vision/
+- BINANCE FUTURES TESTNET: https://testnet.binancefuture.com/en/futures/BTCUSDT
