@@ -1,4 +1,5 @@
 # binance/websocket_client.py
+from utils.logger import logger
 import websockets
 from settings import settings
 
@@ -10,9 +11,9 @@ class BinanceWebSocketClient:
         self.ws = None
 
     async def connect(self):
-        print(f"Connecting to {self.url}")
+        logger.info(f"Connecting to {self.url}")
         self.ws = await websockets.connect(self.url)
-        print("Connected.")
+        logger.info("Connected.")
 
     async def listen(self, onMessage: callable):
         while True:
@@ -21,6 +22,6 @@ class BinanceWebSocketClient:
 
     # Destructor
     def __del__(self):
-        print("Destructor called.")
+        logger.info("Destructor called.")
         if self.ws:
             self.ws.close()

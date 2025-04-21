@@ -1,4 +1,5 @@
 import json
+from utils.logger import logger
 from settings import settings
 import pandas as pd
 import pandas_ta as ta
@@ -6,6 +7,7 @@ import pandas_ta as ta
 
 class Brahmastra:
     dataFrame: pd.DataFrame
+    mustHaveColumnsForTrade: list = ["supertrend", "supertrend_dir", "vwap"]
 
     # This is used to check if supertrend is starting or already started
     isSupertrendStarting: bool = True
@@ -13,12 +15,6 @@ class Brahmastra:
     def __init__(self):
         self.dataFrame = pd.DataFrame(
             columns=["timestamp", "open", "high", "low", "close", "volume"])
-
-    def _displayCandle(self, candle):
-        if (len(self.dataFrame) == 1):
-            print("Timestamp\t\t\tOpen\t\tHigh\t\tLow\t\tClose\t\tVolume")
-        print(f"{candle['timestamp']}\t{candle['open']}\t{candle['high']}\t"
-              f"{candle['low']}\t{candle['close']}\t{candle['volume']}")
 
     def _parseCandle(self, kline):
         preferretTime = kline["T"]+(settings.timeZoneOffsetms)
@@ -31,6 +27,7 @@ class Brahmastra:
             "volume": float(kline["v"]),
         }
 
+    # This function is to append VWAP to the dataframe
     def _appendVWAPToDataFrame(self):
         last_X_rows = self.dataFrame.tail(settings.brahmastraVWAPLen)
         vwap_series = ta.vwap(
@@ -41,6 +38,7 @@ class Brahmastra:
         )
         self.dataFrame.loc[last_X_rows.index, "vwap"] = vwap_series
 
+    # This function is to append supertrend to the dataframe
     def _appendSupertrendSignalToDataFrame(self):
         df = self.dataFrame
         if (len(df) < settings.brahmastraSupertrendPeriod):
@@ -58,9 +56,10 @@ class Brahmastra:
         df["supertrend_dir"] = supertrend[f"SUPERTd_{settings.brahmastraSupertrendPeriod}_{settings.brahmastraSupertrendMultiplier}.0"]
         if self.isSupertrendStarting:
             if df["supertrend_dir"].iloc[-1] == -1:
-                print("Supertrend has kicked in.")
+                logger.info("Supertrend has kicked in.")
                 self.isSupertrendStarting = False
 
+    # This function is to append all data and columns to the dataframe
     def _appendToDataFrame(self, candle):
         newRow = pd.DataFrame([candle])
         newRow.set_index("timestamp", inplace=True)
@@ -75,20 +74,28 @@ class Brahmastra:
     def _getDataFrame(self):
         return self.dataFrame.copy()
 
-    def _VWAPSignal(self):
+    def _getVwapSignal(self):
         recentDf = self.dataFrame.tail(1)
         if (recentDf["close"].values[0] > recentDf["vwap"].values[0]):
             return 1
         elif (recentDf["close"].values[0] < recentDf["vwap"].values[0]):
             return -1
 
-    def _displayDataFrameFilteredColumns(self, columns):
-        # Displaying supertrend and supertrend directions only and if none then displaying waiting for more data and current dataframe length
-        if "supertrend" in self.dataFrame.columns and "supertrend_dir" in self.dataFrame.columns:
-            print(self.dataFrame[columns])
+    def _getSupertrendSignal(self):
+        previousDf = self.dataFrame.tail(2).head(1)
+        recentDf = self.dataFrame.tail(1)
+        if (recentDf["supertrend_dir"].values[0] == 1 and previousDf["supertrend_dir"].values[0] == -1):
+            return 1
+        elif (recentDf["supertrend_dir"].values[0] == -1 and previousDf["supertrend_dir"].values[0] == 1):
+            return -1
         else:
-            print("Waiting for more data. Current dataframe length: ",
-                  len(self.dataFrame))
+            return 0
+
+    def _waitForMoreData(self):
+        if self.isSupertrendStarting:
+            return 1
+        else:
+            return 0
 
     def processKLineData(self, message):
         data = json.loads(message)
@@ -96,4 +103,10 @@ class Brahmastra:
             return
         candle = self._parseCandle(data["k"])
         self._appendToDataFrame(candle)
-        self._displayDataFrameFilteredColumns(["supertrend", "supertrend_dir"])
+        if not self._waitForMoreData():
+            # vwapSignal = self._getVwapSignal()
+            # supertrendSignal = self._getSupertrendSignal()
+            pass
+        else:
+            logger.debug(
+                f"Please wait your system is starting.... Current dataframe length: {len(self.dataFrame)}")
