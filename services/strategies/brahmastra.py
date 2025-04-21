@@ -6,7 +6,9 @@ import pandas_ta as ta
 
 class Brahmastra:
     dataFrame: pd.DataFrame
-    lastVWAPSignal: int = 0
+
+    # This is used to check if supertrend is starting or already started
+    isSupertrendStarting: bool = True
 
     def __init__(self):
         self.dataFrame = pd.DataFrame(
@@ -30,14 +32,34 @@ class Brahmastra:
         }
 
     def _appendVWAPToDataFrame(self):
-        last_10_rows = self.dataFrame.tail(10)
+        last_X_rows = self.dataFrame.tail(settings.brahmastraVWAPLen)
         vwap_series = ta.vwap(
-            last_10_rows["high"],
-            last_10_rows["low"],
-            last_10_rows["close"],
-            last_10_rows["volume"]
+            last_X_rows["high"],
+            last_X_rows["low"],
+            last_X_rows["close"],
+            last_X_rows["volume"]
         )
-        self.dataFrame.loc[last_10_rows.index, "vwap"] = vwap_series
+        self.dataFrame.loc[last_X_rows.index, "vwap"] = vwap_series
+
+    def _appendSupertrendSignalToDataFrame(self):
+        df = self.dataFrame
+        if (len(df) < settings.brahmastraSupertrendPeriod):
+            return
+        supertrend = ta.supertrend(
+            df['high'],
+            df['low'],
+            df['close'],
+            length=settings.brahmastraSupertrendPeriod,
+            multiplier=settings.brahmastraSupertrendMultiplier
+        )
+        if supertrend is None:
+            return
+        df["supertrend"] = supertrend[f"SUPERT_{settings.brahmastraSupertrendPeriod}_{settings.brahmastraSupertrendMultiplier}.0"]
+        df["supertrend_dir"] = supertrend[f"SUPERTd_{settings.brahmastraSupertrendPeriod}_{settings.brahmastraSupertrendMultiplier}.0"]
+        if self.isSupertrendStarting:
+            if df["supertrend_dir"].iloc[-1] == -1:
+                print("Supertrend has kicked in.")
+                self.isSupertrendStarting = False
 
     def _appendToDataFrame(self, candle):
         newRow = pd.DataFrame([candle])
@@ -48,28 +70,25 @@ class Brahmastra:
             self.dataFrame = pd.concat([self.dataFrame, newRow])
 
         self._appendVWAPToDataFrame()
+        self._appendSupertrendSignalToDataFrame()
 
     def _getDataFrame(self):
         return self.dataFrame.copy()
 
     def _VWAPSignal(self):
-        signal = None
-        if (len(self.dataFrame) == 0):
-            return 0
-
         recentDf = self.dataFrame.tail(1)
         if (recentDf["close"].values[0] > recentDf["vwap"].values[0]):
-            signal = 1
+            return 1
         elif (recentDf["close"].values[0] < recentDf["vwap"].values[0]):
-            signal = -1
-        else:
-            signal = 0
+            return -1
 
-        if (self.lastVWAPSignal != signal):
-            self.lastVWAPSignal = signal
-            return signal
+    def _displayDataFrameFilteredColumns(self, columns):
+        # Displaying supertrend and supertrend directions only and if none then displaying waiting for more data and current dataframe length
+        if "supertrend" in self.dataFrame.columns and "supertrend_dir" in self.dataFrame.columns:
+            print(self.dataFrame[columns])
         else:
-            return 0
+            print("Waiting for more data. Current dataframe length: ",
+                  len(self.dataFrame))
 
     def processKLineData(self, message):
         data = json.loads(message)
@@ -77,4 +96,4 @@ class Brahmastra:
             return
         candle = self._parseCandle(data["k"])
         self._appendToDataFrame(candle)
-        print(self._VWAPSignal())
+        self._displayDataFrameFilteredColumns(["supertrend", "supertrend_dir"])

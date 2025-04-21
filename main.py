@@ -3,6 +3,7 @@ import asyncio
 # from binance.api import getCurrentPrice
 from services.binance.websocket_client import BinanceWebSocketClient
 from services.strategies.brahmastra import Brahmastra
+from settings import settings
 
 
 async def main():
@@ -10,7 +11,7 @@ async def main():
     #     price = getCurrentPrice()
     #     print(f"[BTC/USDT] Current price: {price}")
     #     time.sleep(5)
-    client = BinanceWebSocketClient("btcusdt")
+    client = BinanceWebSocketClient("btcusdt", settings.binanceTimeFrame)
     brahmastra = Brahmastra()
     await client.connect()
     await client.listen(brahmastra.processKLineData)
