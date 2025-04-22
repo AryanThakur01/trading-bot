@@ -12,6 +12,11 @@ class Brahmastra:
     # This is used to check if supertrend is starting or already started
     isSupertrendStarting: bool = True
 
+    # Trades
+    shortPositions: list = []
+    longPositions: list = []
+    totalPNL: float = 0.0
+
     def __init__(self):
         self.dataFrame = pd.DataFrame(
             columns=["timestamp", "open", "high", "low", "close", "volume"])
@@ -105,8 +110,25 @@ class Brahmastra:
         self._appendToDataFrame(candle)
         if not self._waitForMoreData():
             # vwapSignal = self._getVwapSignal()
-            # supertrendSignal = self._getSupertrendSignal()
-            pass
+            supertrendSignal = self._getSupertrendSignal()
+            currentDf = self.dataFrame
+
+            if (supertrendSignal == -1):
+                print("Short Position at", currentDf["close"].iloc[-1])
+                self.shortPositions.append({
+                    "timestamp": currentDf.index[-1],
+                    "price": currentDf["close"].iloc[-1],
+                    "pnl": 0.0,
+                })
+                pass
+            elif (supertrendSignal == 1):
+                if (len(self.shortPositions) > 0):
+                    self.shortPositions[-1]["pnl"] = -(currentDf["close"].iloc[-1] - self.shortPositions[-1]["price"])
+                    self.totalPNL += self.shortPositions[-1]["pnl"]
+                    logger.info(
+                        f"Short position closed. Total PNL: {self.totalPNL}")
+                    self.shortPositions.pop()
+                pass
         else:
             logger.debug(
                 f"Please wait your system is starting.... Current dataframe length: {len(self.dataFrame)}")
