@@ -113,22 +113,34 @@ class Brahmastra:
             supertrendSignal = self._getSupertrendSignal()
             currentDf = self.dataFrame
 
-            if (supertrendSignal == -1):
-                print("Short Position at", currentDf["close"].iloc[-1])
-                self.shortPositions.append({
-                    "timestamp": currentDf.index[-1],
-                    "price": currentDf["close"].iloc[-1],
-                    "pnl": 0.0,
-                })
-                pass
-            elif (supertrendSignal == 1):
-                if (len(self.shortPositions) > 0):
-                    self.shortPositions[-1]["pnl"] = -(currentDf["close"].iloc[-1] - self.shortPositions[-1]["price"])
-                    self.totalPNL += self.shortPositions[-1]["pnl"]
-                    logger.info(
-                        f"Short position closed. Total PNL: {self.totalPNL}")
-                    self.shortPositions.pop()
-                pass
+            # if (supertrendSignal == -1):
+            #     if (len(self.longPositions) > 0):
+            #         self.longPositions[-1]["pnl"] = (currentDf["close"].iloc[-1] - self.longPositions[-1]["price"])
+            #         self.totalPNL += self.longPositions[-1]["pnl"]
+            #         logger.info(
+            #             f"Long position closed. Total PNL: {self.totalPNL}")
+            #         self.longPositions.pop()
+            #
+            #     print("Short Position at", currentDf["close"].iloc[-1])
+            #     self.shortPositions.append({
+            #         "timestamp": currentDf.index[-1],
+            #         "price": currentDf["close"].iloc[-1],
+            #         "pnl": 0.0,
+            #     })
+            # elif (supertrendSignal == 1):
+            #     if (len(self.shortPositions) > 0):
+            #         self.shortPositions[-1]["pnl"] = -(currentDf["close"].iloc[-1] - self.shortPositions[-1]["price"])
+            #         self.totalPNL += self.shortPositions[-1]["pnl"]
+            #         logger.info(
+            #             f"Short position closed. Total PNL: {self.totalPNL}")
+            #         self.shortPositions.pop()
+            #
+            #     logger.info(f"Created Long position at: {currentDf['close'].iloc[-1]}")
+            #     self.longPositions.append({
+            #         "timestamp": currentDf.index[-1],
+            #         "price": currentDf["close"].iloc[-1],
+            #         "pnl": 0.0,
+            #     })
         else:
             logger.debug(
                 f"Please wait your system is starting.... Current dataframe length: {len(self.dataFrame)}")
