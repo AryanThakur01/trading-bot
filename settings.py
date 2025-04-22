@@ -17,8 +17,8 @@ class Config:
 
 
 settings = Config(
-    binanceEndpoint=os.getenv("BINANCE_ENDPOINT"),
-    binanceWSSEndpoint=os.getenv("BINANCE_WSS_ENDPOINT"),
+    binanceEndpoint=os.getenv("BINANCE_ENDPOINT", "https://api.binance.com/"),
+    binanceWSSEndpoint=os.getenv("BINANCE_WSS_ENDPOINT", "wss://stream.binance.com:9443/ws"),
     timeZoneOffsetms=eval(os.getenv("TIME_ZONE_OFFSET_MS", 0)),
     brahmastraVWAPLen=eval(os.getenv("BRAHMASTRA_VWAP_LEN", 10)),
     binanceTimeFrame=os.getenv("BINANCE_TIME_FRAME", "1s"),
