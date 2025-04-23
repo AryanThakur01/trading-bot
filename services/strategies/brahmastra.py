@@ -17,6 +17,8 @@ class Brahmastra:
     longPositions: list = []
     totalPNL: float = 0.0
 
+    last4Signals = []
+
     def __init__(self):
         self.dataFrame = pd.DataFrame(
             columns=["timestamp", "open", "high", "low", "close", "volume"])
@@ -148,6 +150,21 @@ class Brahmastra:
         else:
             return 'NEUTRAL'
 
+    def _setLast4Signals(self):
+        if len(self.last4Signals) == 4:
+            self.last4Signals.pop(0)
+
+        self.last4Signals.append({
+            "vwap": self._getVwapSignal(),
+            "supertrend": self._getSupertrendSignal(),
+            "macd": self._getMACDSignal()
+        })
+
+    def _getLast4Signals(self):
+        if len(self.last4Signals) < 4:
+            return None
+        return self.last4Signals
+
     def processKLineData(self, message):
         data = json.loads(message)
         if not data["k"]["x"]:
@@ -155,16 +172,23 @@ class Brahmastra:
         candle = self._parseCandle(data["k"])
         self._appendToDataFrame(candle)
         if not self._waitForMoreData():
-            vwapSignal = self._getVwapSignal()
-            supertrendSignal = self._getSupertrendSignal()
-            macdSignal = self._getMACDSignal()
+            self._setLast4Signals()
+            last4Signals = self._getLast4Signals()
 
-            if (len(self.dataFrame) == settings.minDataFrameLen):
-                logger.info(
-                    "VWAP Signal || Supertrend Signal || MACD Signal")
-            logger.info(
-                f"{self._getSignalName(vwapSignal)} \t\t {self._getSignalName(supertrendSignal)} \t\t {self._getSignalName(macdSignal)}"
-            )
+            # if last4Signals:
+            #     # log all 4 signals
+            #     for signal in last4Signals:
+            #         logger.debug(
+            #             f"VWAP Signal: {self._getSignalName(signal['vwap'])} | Supertrend Signal: {self._getSignalName(signal['supertrend'])} | MACD Signal: {self._getSignalName(signal['macd'])}"
+            #         )
+            #     logger.info("===========================")
+
+            # if (len(self.dataFrame) == settings.minDataFrameLen):
+            #     logger.info(
+            #         "VWAP Signal || Supertrend Signal || MACD Signal")
+            # logger.info(
+            #     f"{self._getSignalName(vwapSignal)} \t\t {self._getSignalName(supertrendSignal)} \t\t {self._getSignalName(macdSignal)}"
+            # )
 
             # currentDf = self.dataFrame
             # if (supertrendSignal == -1):
