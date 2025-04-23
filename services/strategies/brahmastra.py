@@ -139,6 +139,14 @@ class Brahmastra:
         else:
             return 1
 
+    def _getSignalName(self, signal):
+        if signal == 1:
+            return 'BUY'
+        elif signal == -1:
+            return 'SELL'
+        else:
+            return 'NEUTRAL'
+
     def processKLineData(self, message):
         data = json.loads(message)
         if not data["k"]["x"]:
@@ -150,11 +158,12 @@ class Brahmastra:
             supertrendSignal = self._getSupertrendSignal()
             macdSignal = self._getMACDSignal()
 
-            if (len(self.dataFrame) === settings.minDataFrameLen):
+            if (len(self.dataFrame) == settings.minDataFrameLen):
                 logger.info(
                     "VWAP Signal || Supertrend Signal || MACD Signal")
             logger.info(
-                f"{vwapSignal}\t\t{supertrendSignal}\t\t{macdSignal}")
+                f"{self._getSignalName(vwapSignal)} \t\t {self._getSignalName(supertrendSignal)} \t\t {self._getSignalName(macdSignal)}"
+            )
 
             # currentDf = self.dataFrame
             # if (supertrendSignal == -1):
