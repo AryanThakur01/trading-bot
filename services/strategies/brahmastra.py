@@ -10,7 +10,7 @@ class Brahmastra:
     mustHaveColumnsForTrade: list = ["supertrend", "supertrend_dir", "vwap"]
 
     # This is used to check if supertrend is starting or already started
-    isSupertrendStarting: bool = True
+    hasSupertrendStarted: bool = False
 
     # Trades
     shortPositions: list = []
@@ -59,10 +59,10 @@ class Brahmastra:
             return
         df["supertrend"] = supertrend[f"SUPERT_{settings.brahmastraSupertrendPeriod}_{settings.brahmastraSupertrendMultiplier}.0"]
         df["supertrend_dir"] = supertrend[f"SUPERTd_{settings.brahmastraSupertrendPeriod}_{settings.brahmastraSupertrendMultiplier}.0"]
-        if self.isSupertrendStarting:
+        if not self.hasSupertrendStarted:
             if df["supertrend_dir"].iloc[-1] == -1:
                 logger.info("Supertrend has kicked in.")
-                self.isSupertrendStarting = False
+                self.hasSupertrendStarted = True
 
     # This function is to append all data and columns to the dataframe
     def _appendToDataFrame(self, candle):
@@ -80,11 +80,27 @@ class Brahmastra:
         return self.dataFrame.copy()
 
     def _getVwapSignal(self):
-        recentDf = self.dataFrame.tail(1)
-        if (recentDf["close"].values[0] > recentDf["vwap"].values[0]):
-            return 1
-        elif (recentDf["close"].values[0] < recentDf["vwap"].values[0]):
+        if "vwap" not in self.dataFrame.columns or len(self.dataFrame) < 2:
+            return 0
+        recentDf = self.dataFrame.tail(2)
+
+        prev_close = recentDf["close"].iloc[0]
+        prev_vwap = recentDf["vwap"].iloc[0]
+        curr_close = recentDf["close"].iloc[1]
+        curr_vwap = recentDf["vwap"].iloc[1]
+
+        if pd.isna(prev_vwap) or pd.isna(curr_vwap):
+            return 0
+
+        # Mean reversion: price crosses **above** VWAP → SELL
+        if prev_close < prev_vwap and curr_close > curr_vwap:
             return -1
+
+        # Mean reversion: price crosses **below** VWAP → BUY
+        elif prev_close > prev_vwap and curr_close < curr_vwap:
+            return 1
+
+        return 0
 
     def _getSupertrendSignal(self):
         previousDf = self.dataFrame.tail(2).head(1)
@@ -96,11 +112,32 @@ class Brahmastra:
         else:
             return 0
 
-    def _waitForMoreData(self):
-        if self.isSupertrendStarting:
-            return 1
-        else:
+    def _getMACDSignal(self):
+        df = self.dataFrame
+        if len(df) < 35:  # MACD usually needs at least 26+9 candles
             return 0
+        macd_df = ta.macd(df['close'])
+        if macd_df is None or macd_df.isnull().values.any():
+            return 0
+        df['macd'] = macd_df['MACD_12_26_9']
+        df['macd_signal'] = macd_df['MACDs_12_26_9']
+        # Use last two rows to detect crossover
+        recent = df[['macd', 'macd_signal']].tail(2)
+        if len(recent) < 2:
+            return 0
+        prev_macd, prev_signal = recent.iloc[0]
+        curr_macd, curr_signal = recent.iloc[1]
+        if prev_macd < prev_signal and curr_macd > curr_signal:
+            return 1  # Bullish crossover
+        elif prev_macd > prev_signal and curr_macd < curr_signal:
+            return -1  # Bearish crossover
+        return 0  # No crossover
+
+    def _waitForMoreData(self):
+        if (self.hasSupertrendStarted) and len(self.dataFrame) > settings.minDataFrameLen:
+            return 0
+        else:
+            return 1
 
     def processKLineData(self, message):
         data = json.loads(message)
@@ -109,10 +146,17 @@ class Brahmastra:
         candle = self._parseCandle(data["k"])
         self._appendToDataFrame(candle)
         if not self._waitForMoreData():
-            # vwapSignal = self._getVwapSignal()
+            vwapSignal = self._getVwapSignal()
             supertrendSignal = self._getSupertrendSignal()
-            currentDf = self.dataFrame
+            macdSignal = self._getMACDSignal()
 
+            if (len(self.dataFrame) === settings.minDataFrameLen):
+                logger.info(
+                    "VWAP Signal || Supertrend Signal || MACD Signal")
+            logger.info(
+                f"{vwapSignal}\t\t{supertrendSignal}\t\t{macdSignal}")
+
+            # currentDf = self.dataFrame
             # if (supertrendSignal == -1):
             #     if (len(self.longPositions) > 0):
             #         self.longPositions[-1]["pnl"] = (currentDf["close"].iloc[-1] - self.longPositions[-1]["price"])
@@ -143,4 +187,5 @@ class Brahmastra:
             #     })
         else:
             logger.debug(
-                f"Please wait your system is starting.... Current dataframe length: {len(self.dataFrame)}")
+                f"Current dataframe length: {len(self.dataFrame)} || Waiting for more data.... "
+            )
