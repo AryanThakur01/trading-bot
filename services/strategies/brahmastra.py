@@ -114,10 +114,11 @@ class Brahmastra:
 
     def _getMACDSignal(self):
         df = self.dataFrame
-        if len(df) < 35:  # MACD usually needs at least 26+9 candles
+        if len(df) < settings.minDataFrameLen:
             return 0
         macd_df = ta.macd(df['close'])
-        if macd_df is None or macd_df.isnull().values.any():
+        recent = macd_df.tail(2)
+        if macd_df is None or recent.isnull().values.any():
             return 0
         df['macd'] = macd_df['MACD_12_26_9']
         df['macd_signal'] = macd_df['MACDs_12_26_9']
@@ -141,9 +142,9 @@ class Brahmastra:
 
     def _getSignalName(self, signal):
         if signal == 1:
-            return 'BUY'
+            return 'BUY    '
         elif signal == -1:
-            return 'SELL'
+            return 'SELL   '
         else:
             return 'NEUTRAL'
 

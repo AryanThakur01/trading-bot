@@ -22,6 +22,6 @@ class BinanceWebSocketClient:
 
     # Destructor
     def __del__(self):
-        logger.info("Destructor called.")
+        logger.critical("Stopped binance websocket")
         if self.ws:
             self.ws.close()
