@@ -183,7 +183,7 @@ class Brahmastra:
                 })
         elif signal == 1:
             if (len(self.shortPositions) > 0):
-                self.totalPNL += -(price - self.longPositions[-1]["price"])
+                self.totalPNL += -(price - self.shortPositions[-1]["price"])
                 self.shortPositions[-1]["pnl"] = - \
                     (price - self.shortPositions[-1]["price"])
                 logger.info(

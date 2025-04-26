@@ -16,6 +16,9 @@ class Config:
     brahmastraSupertrendPeriod: int
     minDataFrameLen: int
 
+    isBackTesting: bool = False
+    backtestingCandleLimit: int = 1000
+
 
 settings = Config(
     binanceEndpoint=os.getenv("BINANCE_ENDPOINT", "https://api.binance.com/"),
@@ -37,5 +40,11 @@ settings = Config(
     ),
     minDataFrameLen=eval(
         os.getenv("MIN_DATA_FRAME_LEN", '50')
+    ),
+    isBackTesting=eval(
+        os.getenv("IS_BACK_TESTING", 'False')
+    ),
+    backtestingCandleLimit=eval(
+        os.getenv("BACKTESTING_CANDLE_LIMIT", '1000')
     )
 )
