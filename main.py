@@ -1,4 +1,4 @@
-# import time
+import time as t
 import pandas as pd
 import json
 from services.binance.api import getHistoricalData
@@ -20,6 +20,7 @@ async def main():
     if (settings.isBackTesting):
         data = getHistoricalData(symbol='BTCUSDT',
                                  interval=settings.binanceTimeFrame, limit=settings.backtestingCandleLimit)
+        print(len(data))
         for i in range(len(data)):
             d = data[i]
             brahmastra.processKLineData(json.dumps(d))
@@ -27,6 +28,9 @@ async def main():
                 d['k']['T']+settings.timeZoneOffsetms, unit="ms")
             print(
                 f"[Backtesting] {i}: {time} - {d['k']['c']} - {d['k']['v']}")
+            if (i % 288 == 0 and i != 0):
+                print('1 day over 5 sec wait')
+                t.sleep(5)
     else:
         client = BinanceWebSocketClient("btcusdt", settings.binanceTimeFrame)
         await client.connect()

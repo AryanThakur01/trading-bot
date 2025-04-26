@@ -248,13 +248,13 @@ class Brahmastra:
                 logger.warn(
                     f"=============================== Supertrend says: {recentSupertrendSignal}")
                 self._currentPositions(currentDf["close"].iloc[-1])
-                if (len(self.shortPositions) > 0 and recentSupertrendSignal == 1):
+                if (len(self.shortPositions) > 0 and (recentSupertrendSignal == 1 or recentMACDSignal == 1)):
                     self._position(
                         currentDf.index[-1],
                         currentDf["close"].iloc[-1],
                         recentSupertrendSignal
                     )
-                elif (len(self.longPositions) > 0 and recentSupertrendSignal == -1):
+                elif (len(self.longPositions) > 0 and (recentSupertrendSignal == -1 or recentMACDSignal == -1)):
                     self._position(
                         currentDf.index[-1],
                         currentDf["close"].iloc[-1],
@@ -276,7 +276,7 @@ class Brahmastra:
                         self._position(
                             self.dataFrame.index[-1],
                             self.dataFrame["close"].iloc[-1],
-                            netSignal,
+                            -netSignal,
                             isNewPos=True
                         )
                         logger.info(
@@ -285,7 +285,7 @@ class Brahmastra:
                         self._position(
                             self.dataFrame.index[-1],
                             self.dataFrame["close"].iloc[-1],
-                            netSignal,
+                            -netSignal,
                             isNewPos=True
                         )
                         logger.error(

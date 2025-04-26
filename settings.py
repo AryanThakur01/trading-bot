@@ -16,6 +16,7 @@ class Config:
     brahmastraSupertrendPeriod: int
     minDataFrameLen: int
 
+    startDate: str
     isBackTesting: bool = False
     backtestingCandleLimit: int = 1000
 
@@ -46,5 +47,6 @@ settings = Config(
     ),
     backtestingCandleLimit=eval(
         os.getenv("BACKTESTING_CANDLE_LIMIT", '1000')
-    )
+    ),
+    startDate=os.getenv("START_DATE", "2023-01-01 00:00:00")
 )
