@@ -6,6 +6,8 @@ import pandas_ta as ta
 
 
 class Brahmastra:
+    trades = 0
+    passes = 0
     dataFrame: pd.DataFrame
     mustHaveColumnsForTrade: list = ["supertrend", "supertrend_dir", "vwap"]
 
@@ -171,10 +173,13 @@ class Brahmastra:
                 self.totalPNL += price - self.longPositions[-1]["price"]
                 self.longPositions[-1]["pnl"] = (price -
                                                  self.longPositions[-1]["price"])
+                if (self.longPositions[-1]["pnl"] > 0):
+                    self.passes += 1
                 logger.info(
                     f"Long position closed. Total PNL: {self.totalPNL}")
                 self.longPositions.pop()
             elif isNewPos:
+                self.trades += 1
                 logger.info(f"Created Short position at: {price}")
                 self.shortPositions.append({
                     "timestamp": timestamp,
@@ -186,10 +191,13 @@ class Brahmastra:
                 self.totalPNL += -(price - self.shortPositions[-1]["price"])
                 self.shortPositions[-1]["pnl"] = - \
                     (price - self.shortPositions[-1]["price"])
+                if (self.shortPositions[-1]["pnl"] > 0):
+                    self.passes += 1
                 logger.info(
                     f"Short position closed. Total PNL: {self.totalPNL}")
                 self.shortPositions.pop()
             elif isNewPos:
+                self.trades += 1
                 logger.info(f"Created Long position at: {price}")
                 self.longPositions.append({
                     "timestamp": timestamp,
@@ -285,6 +293,11 @@ class Brahmastra:
                     else:
                         logger.debug(
                             f"NEUTRAL Signal: {netSignal}")
+
+            print("Successfull Trades: ", self.passes)
+            print("Total Trades: ", self.trades)
+            if self.trades > 0:
+                print("Accuracy: ", (self.passes/self.trades)*100, "%")
 
             # if (len(self.dataFrame) == settings.minDataFrameLen):
             #     logger.info(
