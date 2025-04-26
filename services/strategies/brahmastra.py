@@ -165,6 +165,55 @@ class Brahmastra:
             return None
         return self.last4Signals
 
+    def _position(self, timestamp, price, signal):
+        if signal == -1:
+            if (len(self.longPositions) > 0):
+                self.totalPNL += price - self.longPositions[-1]["price"]
+                self.longPositions[-1]["pnl"] = (price -
+                                                 self.longPositions[-1]["price"])
+                logger.info(
+                    f"Long position closed. Total PNL: {self.totalPNL}")
+                self.longPositions.pop()
+            else:
+                logger.info(f"Created Short position at: {price}")
+                self.shortPositions.append({
+                    "timestamp": timestamp,
+                    "price": price,
+                    "pnl": 0.0,
+                })
+        elif signal == 1:
+            if (len(self.shortPositions) > 0):
+                self.totalPNL += -(price - self.longPositions[-1]["price"])
+                self.shortPositions[-1]["pnl"] = - \
+                    (price - self.shortPositions[-1]["price"])
+                logger.info(
+                    f"Short position closed. Total PNL: {self.totalPNL}")
+                self.shortPositions.pop()
+            else:
+                logger.info(f"Created Long position at: {price}")
+                self.longPositions.append({
+                    "timestamp": timestamp,
+                    "price": price,
+                    "pnl": 0.0,
+                })
+
+    def _currentPositions(self, price):
+        if len(self.longPositions) > 0:
+            posPNL = price - self.longPositions[-1]["price"]
+            logger.info(
+                f"Current Long Position: {self.longPositions[-1]['price']} | position PNL: {posPNL}")
+        if len(self.shortPositions) > 0:
+            posPNL = -(price - self.shortPositions[-1]["price"])
+            logger.info(
+                f"Current Short Position: {self.shortPositions[-1]['price']} | position PNL: {posPNL}")
+
+        if self.totalPNL > 0:
+            logger.info(f"Total PNL: {self.totalPNL}")
+        elif self.totalPNL < 0:
+            logger.error(f"Total PNL: {self.totalPNL}")
+        else:
+            logger.debug(f"Total PNL: {self.totalPNL}")
+
     def processKLineData(self, message):
         data = json.loads(message)
         if not data["k"]["x"]:
@@ -175,13 +224,63 @@ class Brahmastra:
             self._setLast4Signals()
             last4Signals = self._getLast4Signals()
 
-            # if last4Signals:
-            #     # log all 4 signals
-            #     for signal in last4Signals:
-            #         logger.debug(
-            #             f"VWAP Signal: {self._getSignalName(signal['vwap'])} | Supertrend Signal: {self._getSignalName(signal['supertrend'])} | MACD Signal: {self._getSignalName(signal['macd'])}"
-            #         )
-            #     logger.info("===========================")
+            if last4Signals:
+                # # log all 4 signals
+                # for signal in last4Signals:
+                #     logger.debug(
+                #         f"VWAP Signal: {self._getSignalName(signal['vwap'])} | Supertrend Signal: {self._getSignalName(signal['supertrend'])} | MACD Signal: {self._getSignalName(signal['macd'])}"
+                #     )
+                # logger.info("================================================")
+
+                recentSupertrendSignal = last4Signals[-1]["supertrend"]
+                recentMACDSignal = last4Signals[-1]["macd"]
+                netSignal = 0
+                currentDf = self.dataFrame
+
+                self._currentPositions(currentDf["close"].iloc[-1])
+                if (len(self.shortPositions) > 0 and recentSupertrendSignal == 1):
+                    self._position(
+                        currentDf.index[-1],
+                        currentDf["close"].iloc[-1],
+                        recentSupertrendSignal
+                    )
+                elif (len(self.longPositions) > 0 and recentSupertrendSignal == -1):
+                    self._position(
+                        currentDf.index[-1],
+                        currentDf["close"].iloc[-1],
+                        recentSupertrendSignal
+                    )
+                else:
+                    if recentSupertrendSignal != 0:
+                        for signal in last4Signals:
+                            if signal["macd"] != 0:
+                                if signal["macd"] == recentSupertrendSignal:
+                                    netSignal = recentSupertrendSignal
+                    elif recentMACDSignal != 0:
+                        for signal in last4Signals:
+                            if signal["supertrend"] != 0:
+                                if signal["supertrend"] == recentMACDSignal:
+                                    netSignal = recentMACDSignal
+
+                    if netSignal == 1:
+                        self._position(
+                            self.dataFrame.index[-1],
+                            self.dataFrame["close"].iloc[-1],
+                            netSignal
+                        )
+                        logger.info(
+                            f"BUY Signal: {netSignal}")
+                    elif netSignal == -1:
+                        self._position(
+                            self.dataFrame.index[-1],
+                            self.dataFrame["close"].iloc[-1],
+                            netSignal
+                        )
+                        logger.error(
+                            f"SELL Signal: {netSignal}")
+                    else:
+                        logger.debug(
+                            f"NEUTRAL Signal: {netSignal}")
 
             # if (len(self.dataFrame) == settings.minDataFrameLen):
             #     logger.info(
