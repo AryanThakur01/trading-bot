@@ -165,7 +165,7 @@ class Brahmastra:
             return None
         return self.last4Signals
 
-    def _position(self, timestamp, price, signal):
+    def _position(self, timestamp, price, signal, isNewPos=False):
         if signal == -1:
             if (len(self.longPositions) > 0):
                 self.totalPNL += price - self.longPositions[-1]["price"]
@@ -174,7 +174,7 @@ class Brahmastra:
                 logger.info(
                     f"Long position closed. Total PNL: {self.totalPNL}")
                 self.longPositions.pop()
-            else:
+            elif isNewPos:
                 logger.info(f"Created Short position at: {price}")
                 self.shortPositions.append({
                     "timestamp": timestamp,
@@ -189,7 +189,7 @@ class Brahmastra:
                 logger.info(
                     f"Short position closed. Total PNL: {self.totalPNL}")
                 self.shortPositions.pop()
-            else:
+            elif isNewPos:
                 logger.info(f"Created Long position at: {price}")
                 self.longPositions.append({
                     "timestamp": timestamp,
@@ -237,6 +237,8 @@ class Brahmastra:
                 netSignal = 0
                 currentDf = self.dataFrame
 
+                logger.warn(
+                    f"=============================== Supertrend says: {recentSupertrendSignal}")
                 self._currentPositions(currentDf["close"].iloc[-1])
                 if (len(self.shortPositions) > 0 and recentSupertrendSignal == 1):
                     self._position(
@@ -266,7 +268,8 @@ class Brahmastra:
                         self._position(
                             self.dataFrame.index[-1],
                             self.dataFrame["close"].iloc[-1],
-                            netSignal
+                            netSignal,
+                            isNewPos=True
                         )
                         logger.info(
                             f"BUY Signal: {netSignal}")
@@ -274,7 +277,8 @@ class Brahmastra:
                         self._position(
                             self.dataFrame.index[-1],
                             self.dataFrame["close"].iloc[-1],
-                            netSignal
+                            netSignal,
+                            isNewPos=True
                         )
                         logger.error(
                             f"SELL Signal: {netSignal}")
