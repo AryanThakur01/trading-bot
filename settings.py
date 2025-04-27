@@ -10,7 +10,6 @@ class Config:
     binanceEndpoint: str
     binanceWSSEndpoint: str
     timeZoneOffsetms: int
-    brahmastraVWAPLen: int
     binanceTimeFrame: str
     brahmastraSupertrendMultiplier: int
     brahmastraSupertrendPeriod: int
@@ -30,9 +29,6 @@ settings = Config(
     timeZoneOffsetms=eval(
         os.getenv("TIME_ZONE_OFFSET_MS", '0')
     ),
-    brahmastraVWAPLen=eval(
-        os.getenv("BRAHMASTRA_VWAP_LEN", '10')
-    ),
     brahmastraSupertrendMultiplier=eval(
         os.getenv("BRAHMASTRA_SUPERTREND_MULTIPLIER", '2')
     ),
@@ -48,5 +44,5 @@ settings = Config(
     backtestingCandleLimit=eval(
         os.getenv("BACKTESTING_CANDLE_LIMIT", '1000')
     ),
-    startDate=os.getenv("START_DATE", "2023-01-01 00:00:00")
+    startDate=os.getenv("START_DATE")
 )
