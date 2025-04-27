@@ -11,8 +11,8 @@ class Config:
     binanceWSSEndpoint: str
     timeZoneOffsetms: int
     binanceTimeFrame: str
-    brahmastraSupertrendMultiplier: int
-    brahmastraSupertrendPeriod: int
+    supertrendMultiplier: int
+    supertrendPeriod: int
     minDataFrameLen: int
 
     startDate: str
@@ -29,11 +29,11 @@ settings = Config(
     timeZoneOffsetms=eval(
         os.getenv("TIME_ZONE_OFFSET_MS", '0')
     ),
-    brahmastraSupertrendMultiplier=eval(
-        os.getenv("BRAHMASTRA_SUPERTREND_MULTIPLIER", '2')
+    supertrendMultiplier=eval(
+        os.getenv("SUPERTREND_MULTIPLIER", '2')
     ),
-    brahmastraSupertrendPeriod=eval(
-        os.getenv("BRAHMASTRA_SUPERTREND_PERIOD", '20')
+    supertrendPeriod=eval(
+        os.getenv("SUPERTREND_PERIOD", '20')
     ),
     minDataFrameLen=eval(
         os.getenv("MIN_DATA_FRAME_LEN", '50')

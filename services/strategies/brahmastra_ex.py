@@ -50,19 +50,19 @@ class Brahmastra:
     # This function is to append supertrend to the dataframe
     def _appendSupertrendSignalToDataFrame(self):
         df = self.dataFrame
-        if (len(df) < settings.brahmastraSupertrendPeriod):
+        if (len(df) < settings.supertrendPeriod):
             return
         supertrend = ta.supertrend(
             df['high'],
             df['low'],
             df['close'],
-            length=settings.brahmastraSupertrendPeriod,
-            multiplier=settings.brahmastraSupertrendMultiplier
+            length=settings.supertrendPeriod,
+            multiplier=settings.supertrendMultiplier
         )
         if supertrend is None:
             return
-        df["supertrend"] = supertrend[f"SUPERT_{settings.brahmastraSupertrendPeriod}_{settings.brahmastraSupertrendMultiplier}.0"]
-        df["supertrend_dir"] = supertrend[f"SUPERTd_{settings.brahmastraSupertrendPeriod}_{settings.brahmastraSupertrendMultiplier}.0"]
+        df["supertrend"] = supertrend[f"SUPERT_{settings.supertrendPeriod}_{settings.supertrendMultiplier}.0"]
+        df["supertrend_dir"] = supertrend[f"SUPERTd_{settings.supertrendPeriod}_{settings.supertrendMultiplier}.0"]
         if not self.hasSupertrendStarted:
             if df["supertrend_dir"].iloc[-1] == -1:
                 logger.info("Supertrend has kicked in.")

@@ -40,10 +40,17 @@ class Brahmastra(Strategy, Indicators):
             last_X_rows = self.dataFrame.tail(
                 settings.minDataFrameLen) if settings.minDataFrameLen > 0 else self.dataFrame
             vwap = super().calculateVWAP(last_X_rows)
-            print(last_X_rows.index, vwap)
             self.dataFrame.loc[last_X_rows.index, "vwap"] = vwap
+
+            supertrend = super().calculateSupertrend(self.dataFrame)
+            if supertrend is not None:
+                self.dataFrame["supertrend"] = supertrend["supertrend"]
+                self.dataFrame["supertrend_dir"] = supertrend["supertrend_dir"]
+                # if not self.hasSupertrendStarted:
+                #     if df["supertrend_dir"].iloc[-1] == -1:
+                #         logger.info("Supertrend has kicked in.")
+                #         self.hasSupertrendStarted = True
             print(self.dataFrame)
-            logger.info("==========================")
 
     def isCandleClosed(self, kline):
         kline_data = kline['k']

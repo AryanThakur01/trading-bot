@@ -1,4 +1,5 @@
 import pandas as pd
+from settings import settings
 import pandas_ta as ta
 
 
@@ -17,3 +18,20 @@ class Indicators:
             last_X_rows["volume"]
         )
         return vwap_series
+
+    def calculateSupertrend(self, df: pd.DataFrame):
+        if (len(df) < settings.supertrendPeriod):
+            return
+
+        supertrend = ta.supertrend(
+            df['high'],
+            df['low'],
+            df['close'],
+            length=settings.supertrendPeriod,
+            multiplier=settings.supertrendMultiplier
+        )
+        supertrend["supertrend"] = supertrend[
+            f"SUPERT_{settings.supertrendPeriod}_{settings.supertrendMultiplier}.0"]
+        supertrend["supertrend_dir"] = supertrend[
+            f"SUPERTd_{settings.supertrendPeriod}_{settings.supertrendMultiplier}.0"]
+        return supertrend
