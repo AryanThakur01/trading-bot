@@ -276,7 +276,7 @@ class Brahmastra:
                         self._position(
                             self.dataFrame.index[-1],
                             self.dataFrame["close"].iloc[-1],
-                            -netSignal,
+                            netSignal,
                             isNewPos=True
                         )
                         logger.info(
@@ -285,7 +285,7 @@ class Brahmastra:
                         self._position(
                             self.dataFrame.index[-1],
                             self.dataFrame["close"].iloc[-1],
-                            -netSignal,
+                            netSignal,
                             isNewPos=True
                         )
                         logger.error(
