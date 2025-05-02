@@ -9,6 +9,7 @@ from services.strategies.strategy import Strategy
 
 class Brahmastra(Strategy, Indicators):
     dataFrame: pd.DataFrame
+    hasSupertrendStarted: bool = False
 
     def __init__(self):
         self.dataFrame = pd.DataFrame(
@@ -27,6 +28,29 @@ class Brahmastra(Strategy, Indicators):
             "volume": float(kline["v"]),
         }
 
+    def _appendSupertrend(self, df):
+        supertrend = super().calculateSupertrend(df)
+        if supertrend is not None:
+            self.dataFrame["supertrend"] = supertrend["supertrend"]
+            self.dataFrame["supertrend_dir"] = supertrend["supertrend_dir"]
+            if not self.hasSupertrendStarted:
+                if self.dataFrame["supertrend_dir"].iloc[-1] == -1:
+                    logger.info("Supertrend has kicked in.")
+                    self.hasSupertrendStarted = True
+        return df
+
+    def _appendMACD(self, df):
+        macd_df = super()._getMACD(df)
+        if macd_df is None:
+            return None
+        df['macd'] = macd_df['MACD_12_26_9']
+        df['macd_signal'] = macd_df['MACDs_12_26_9']
+        return df
+
+    def _getLast4Signals(self, df):
+        if len(df) < 4:
+            return
+
     def appendCandleToDataFrame(self, raw):
         candle = self._parseCandle(raw)
         newRow = pd.DataFrame([candle])
@@ -37,20 +61,20 @@ class Brahmastra(Strategy, Indicators):
             self.dataFrame = pd.concat([self.dataFrame, newRow])
 
         if (len(self.dataFrame) >= settings.minDataFrameLen):
+            # Calculate and add vwap to dataframe
             last_X_rows = self.dataFrame.tail(
-                settings.minDataFrameLen) if settings.minDataFrameLen > 0 else self.dataFrame
+                settings.minDataFrameLen
+            ) if settings.minDataFrameLen > 0 else self.dataFrame
             vwap = super().calculateVWAP(last_X_rows)
             self.dataFrame.loc[last_X_rows.index, "vwap"] = vwap
 
-            supertrend = super().calculateSupertrend(self.dataFrame)
-            if supertrend is not None:
-                self.dataFrame["supertrend"] = supertrend["supertrend"]
-                self.dataFrame["supertrend_dir"] = supertrend["supertrend_dir"]
-                # if not self.hasSupertrendStarted:
-                #     if df["supertrend_dir"].iloc[-1] == -1:
-                #         logger.info("Supertrend has kicked in.")
-                #         self.hasSupertrendStarted = True
-            print(self.dataFrame)
+            # Calculate and add supertrend to dataframe
+            self.dataFrame = self._appendSupertrend(self.dataFrame)
+
+            # Calculate and add macd to dataframe
+            newDf = self._appendMACD(self.dataFrame)
+            if newDf is not None:
+                self.dataFrame = newDf
 
     def isCandleClosed(self, kline):
         kline_data = kline['k']
@@ -63,5 +87,3 @@ class Brahmastra(Strategy, Indicators):
             return
 
         self.appendCandleToDataFrame(data['k'])
-
-        # kline = self.parseCandle(data['k'])

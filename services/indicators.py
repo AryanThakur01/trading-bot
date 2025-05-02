@@ -35,3 +35,6 @@ class Indicators:
         supertrend["supertrend_dir"] = supertrend[
             f"SUPERTd_{settings.supertrendPeriod}_{settings.supertrendMultiplier}.0"]
         return supertrend
+
+    def _getMACD(self, df: pd.DataFrame):
+        return ta.macd(df['close'])
