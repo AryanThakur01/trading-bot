@@ -10,6 +10,7 @@ from services.strategies.strategy import Strategy
 class Brahmastra(Strategy, Indicators):
     dataFrame: pd.DataFrame
     hasSupertrendStarted: bool = False
+    lastSignal: int = 0
 
     def __init__(self):
         self.dataFrame = pd.DataFrame(
@@ -31,10 +32,10 @@ class Brahmastra(Strategy, Indicators):
     def _appendSupertrend(self, df):
         supertrend = super().calculateSupertrend(df)
         if supertrend is not None:
-            self.dataFrame["supertrend"] = supertrend["supertrend"]
-            self.dataFrame["supertrend_dir"] = supertrend["supertrend_dir"]
+            df["supertrend"] = supertrend["supertrend"]
+            df["supertrend_dir"] = supertrend["supertrend_dir"]
             if not self.hasSupertrendStarted:
-                if self.dataFrame["supertrend_dir"].iloc[-1] == -1:
+                if df["supertrend_dir"].iloc[-1] == -1:
                     logger.info("Supertrend has kicked in.")
                     self.hasSupertrendStarted = True
         return df
@@ -51,34 +52,100 @@ class Brahmastra(Strategy, Indicators):
         if len(df) < 4:
             return
 
-    def appendCandleToDataFrame(self, raw):
+    def appendCandleToDataFrame(self, raw, dataFrame: pd.DataFrame):
         candle = self._parseCandle(raw)
         newRow = pd.DataFrame([candle])
         newRow.set_index("timestamp", inplace=True)
-        if self.dataFrame.empty:
-            self.dataFrame = newRow
+        if dataFrame.empty:
+            dataFrame = newRow
         else:
-            self.dataFrame = pd.concat([self.dataFrame, newRow])
+            dataFrame = pd.concat([dataFrame, newRow])
 
-        if (len(self.dataFrame) >= settings.minDataFrameLen):
+        if (len(dataFrame) >= settings.minDataFrameLen):
             # Calculate and add vwap to dataframe
-            last_X_rows = self.dataFrame.tail(
+            last_X_rows = dataFrame.tail(
                 settings.minDataFrameLen
-            ) if settings.minDataFrameLen > 0 else self.dataFrame
+            ) if settings.minDataFrameLen > 0 else dataFrame
             vwap = super().calculateVWAP(last_X_rows)
-            self.dataFrame.loc[last_X_rows.index, "vwap"] = vwap
+            dataFrame.loc[last_X_rows.index, "vwap"] = vwap
 
             # Calculate and add supertrend to dataframe
-            self.dataFrame = self._appendSupertrend(self.dataFrame)
+            dataFrame = self._appendSupertrend(dataFrame)
 
             # Calculate and add macd to dataframe
-            newDf = self._appendMACD(self.dataFrame)
+            newDf = self._appendMACD(dataFrame)
             if newDf is not None:
-                self.dataFrame = newDf
+                dataFrame = newDf
+        return dataFrame
 
     def isCandleClosed(self, kline):
         kline_data = kline['k']
         return kline_data['x']
+
+    def _calculateMACDSignal(self, df: pd.DataFrame):
+        if df is None or len(df) < 4:
+            return False
+        macdList = df["macd"].tolist()
+        macdSignalList = df["macd_signal"].tolist()
+
+        for i in range(1, len(df)):
+            if macdList[-i] > macdSignalList[-i] and macdList[-(i-1)] < macdSignalList[-(i-1)]:
+                return 1
+            elif macdList[-i] < macdSignalList[-i] and macdList[-(i-1)] > macdSignalList[-(i-1)]:
+                return -1
+
+        return 0
+
+    def _calculateSupertrendSignal(self, df: pd.DataFrame):
+        # Supertrend Signal calculation
+        supertrendDirs = df["supertrend_dir"].tolist()
+        supertrendSignal = supertrendDirs[-1]
+
+        for i in range(len(supertrendDirs)):
+            if supertrendDirs[i] != supertrendSignal:
+                return supertrendSignal
+        return 0
+
+    def calculateBrahmastraSignal(self, df: pd.DataFrame, originalDf: pd.DataFrame = None):
+        if (len(originalDf) < settings.minDataFrameLen):
+            logger.warning("Not enough data to calculate Brahmastra signal.")
+            return 0
+        required_columns = ["vwap", "supertrend_dir", "macd", "macd_signal"]
+
+        # Check if we have at least 4 rows
+        if len(df) < 4:
+            logger.warning("Not enough data to calculate Brahmastra signal.")
+            return 0
+
+        # Check if all required columns exist
+        for col in required_columns:
+            if col not in df.columns:
+                logger.warning(f"Missing required column: {col}")
+                return 0
+
+        supertrendSignal = self._calculateSupertrendSignal(df)
+        macdSignal = self._calculateMACDSignal(df)
+
+        if (supertrendSignal == macdSignal):
+            signal = supertrendSignal
+            if (self.lastSignal == signal):
+                print("Do nothing")
+                return 0
+            self.lastSignal = signal
+
+            if signal == 1:
+                logger.info(
+                    f"Buy Signal at {df.iloc[-1]['close']}, Stoploss: {df.iloc[-1]['supertrend'] - 100}")
+                return 1
+            elif signal == -1:
+                logger.critical(
+                    f"Sell Signal at {df.iloc[-1]['close']}, Stoploss: {df.iloc[-1]['supertrend'] + 100}")
+                return -1
+            else:
+                print("Do nothing")
+                return 0
+
+        return 0
 
     def processKLineData(self, message):
         data = json.loads(message)
@@ -86,4 +153,8 @@ class Brahmastra(Strategy, Indicators):
             # Check if the KLine is closed ignore if not
             return
 
-        self.appendCandleToDataFrame(data['k'])
+        self.dataFrame = self.appendCandleToDataFrame(
+            data['k'], self.dataFrame)
+
+        calculatedSignal = self.calculateBrahmastraSignal(
+            self.dataFrame.tail(4), self.dataFrame)
