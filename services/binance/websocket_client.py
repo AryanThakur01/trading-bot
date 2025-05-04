@@ -18,7 +18,7 @@ class BinanceWebSocketClient:
     async def listen(self, onMessage: callable):
         while True:
             message = await self.ws.recv()
-            onMessage(message)
+            await onMessage(message)
 
     # Destructor
     def __del__(self):

@@ -16,8 +16,12 @@ class Config:
     minDataFrameLen: int
 
     startDate: str
-    isBackTesting: bool = False
-    backtestingCandleLimit: int = 1000
+    isBackTesting: bool
+    backtestingCandleLimit: int
+
+    isForwardTesting: bool
+    binanceTestingEndpoint: str
+    binanceTestingWSSEndpoint: str
 
 
 settings = Config(
@@ -44,5 +48,15 @@ settings = Config(
     backtestingCandleLimit=eval(
         os.getenv("BACKTESTING_CANDLE_LIMIT", '1000')
     ),
-    startDate=os.getenv("START_DATE")
+    startDate=os.getenv("START_DATE"),
+
+    isForwardTesting=eval(
+        os.getenv("IS_FORWARD_TESTING", 'False')
+    ),
+    binanceTestingEndpoint=os.getenv(
+        "BINANCE_TESTING_ENDPOINT", "https://testnet.binancefuture.com"
+    ),
+    binanceTestingWSSEndpoint=os.getenv(
+        "BINANCE_TESTING_WSS_ENDPOINT", "wss://testnet.binancefuture.com/ws"
+    )
 )

@@ -18,7 +18,11 @@ async def main():
 
     # BRAHMASTRA STRATEGY
     brahmastra = Brahmastra()
-    if (settings.isBackTesting):
+
+    if (settings.isForwardTesting):
+        print('Forward testing mode')
+        pass
+    elif (settings.isBackTesting):
         data = getHistoricalData(symbol='BTCUSDT',
                                  interval=settings.binanceTimeFrame, limit=settings.backtestingCandleLimit)
         for i in range(len(data)):
@@ -29,10 +33,10 @@ async def main():
             logger.debug(
                 f"[Backtesting{len(data)}] {i}: {time} - {d['k']['c']} - {d['k']['v']}")
 
-            brahmastra.processKLineData(json.dumps(d))
+            await brahmastra.processKLineData(json.dumps(d))
 
             if (i % 288 == 0 and i != 0):
-                print('1 day over 5 sec wait')
+                print(f"{(i / 288)} day(s) over 5 sec wait")
                 t.sleep(5)
     else:
         client = BinanceWebSocketClient("btcusdt", settings.binanceTimeFrame)

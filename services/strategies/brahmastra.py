@@ -5,18 +5,22 @@ from settings import settings
 import pandas as pd
 import pandas_ta as ta
 from services.strategies.strategy import Strategy
+from services.position import Position
 
 
 class Brahmastra(Strategy, Indicators):
     dataFrame: pd.DataFrame
     hasSupertrendStarted: bool = False
+    positionService: Position
     lastSignal: int = 0
+    tradedDirection: int = None
 
     def __init__(self):
         self.dataFrame = pd.DataFrame(
             columns=["timestamp", "open", "high", "low", "close", "volume"])
         self.dataFrame.set_index("timestamp", inplace=True)
         self.dataFrame.sort_index(inplace=True)
+        self.positionService = Position()
 
     def _parseCandle(self, kline):
         preferretTime = kline["T"]+(settings.timeZoneOffsetms)
@@ -106,12 +110,8 @@ class Brahmastra(Strategy, Indicators):
                 return supertrendSignal
         return 0
 
-    def calculateBrahmastraSignal(self, df: pd.DataFrame, originalDf: pd.DataFrame = None):
-        if (len(originalDf) < settings.minDataFrameLen):
-            logger.warning("Not enough data to calculate Brahmastra signal.")
-            return 0
+    def hasAllRequiredColumnsAndRows(self, df: pd.DataFrame):
         required_columns = ["vwap", "supertrend_dir", "macd", "macd_signal"]
-
         # Check if we have at least 4 rows
         if len(df) < 4:
             logger.warning("Not enough data to calculate Brahmastra signal.")
@@ -122,39 +122,71 @@ class Brahmastra(Strategy, Indicators):
             if col not in df.columns:
                 logger.warning(f"Missing required column: {col}")
                 return 0
+        return 1
+
+    def calculateBrahmastraSignal(self, df: pd.DataFrame, originalDf: pd.DataFrame = None):
+        if (len(originalDf) < settings.minDataFrameLen or not self.hasAllRequiredColumnsAndRows(df)):
+            logger.warning("Not enough data to calculate Brahmastra signal.")
+            return 0
 
         supertrendSignal = self._calculateSupertrendSignal(df)
         macdSignal = self._calculateMACDSignal(df)
+        print(
+            f"Supertrend Signal: {supertrendSignal}, MACD Signal: {macdSignal}")
 
-        if (supertrendSignal == macdSignal):
-            signal = supertrendSignal
-            if (self.lastSignal == signal):
-                print("Do nothing")
-                return 0
-            self.lastSignal = signal
-
-            if signal == 1:
-                logger.info(
-                    f"Buy Signal at {df.iloc[-1]['close']}, Stoploss: {df.iloc[-1]['supertrend'] - 100}")
-                return 1
-            elif signal == -1:
-                logger.critical(
-                    f"Sell Signal at {df.iloc[-1]['close']}, Stoploss: {df.iloc[-1]['supertrend'] + 100}")
-                return -1
-            else:
-                print("Do nothing")
-                return 0
-
+        lastSignal = self.lastSignal
+        if (macdSignal == supertrendSignal):
+            self.lastSignal = supertrendSignal
+            if (supertrendSignal != lastSignal):
+                return supertrendSignal
         return 0
 
-    def processKLineData(self, message):
+    def calculateExitSignal(self, df: pd.DataFrame):
+        if not self.hasAllRequiredColumnsAndRows(df):
+            logger.warning(
+                "Not enough data to calculate Brahmastra exit signal.")
+            return 0
+        if (self.tradedDirection is not None and df.iloc[-1]['supertrend_dir'] != self.tradedDirection):
+            print(
+                f"Exit signal triggered at {df.iloc[-1]['supertrend_dir']} and {self.tradedDirection}")
+            return 1
+        return 0
+
+    async def crateOrder(self, signal: int, price: float = None):
+        if signal == 1:
+            self.tradedDirection = 1
+            await self.positionService.order(
+                symbol='btcusdt',
+                side='BUY',
+                stopPrice=self.dataFrame.iloc[-1]['supertrend'] - 200,
+                price=price,
+            )
+        elif signal == -1:
+            self.tradedDirection = -1
+            await self.positionService.order(
+                symbol='btcusdt',
+                side='SELL',
+                stopPrice=self.dataFrame.iloc[-1]['supertrend'] + 200,
+                price=price,
+            )
+
+    async def processKLineData(self, message):
         data = json.loads(message)
         if not self.isCandleClosed(data):
             # Check if the KLine is closed ignore if not
             return
 
+        self.positionService.getTotalPNL()
         self.dataFrame = self.appendCandleToDataFrame(
             data['k'], self.dataFrame)
 
         calculatedSignal = self.calculateBrahmastraSignal(
             self.dataFrame.tail(4), self.dataFrame)
+
+        if (self.calculateExitSignal(self.dataFrame) == 1):
+            await self.positionService.closePosition(
+                symbol='btcusdt', price=self.dataFrame.iloc[-1]['close'])
+        if (calculatedSignal != 0):
+            await self.crateOrder(calculatedSignal, self.dataFrame.iloc[-1]['close'])
+
+        self.positionService.exportTradesToCSV()

@@ -68,7 +68,7 @@ def getHistoricalData(symbol, interval, limit):
         settings.startDate, "%Y-%m-%d %H:%M:%S"))*1000)
     returnData = []
     while True:
-        response = getHistoricalPrice(symbol, interval, limit)
+        response = getHistoricalPrice(symbol, interval, limit, startTime)
         if response.status_code == 200:
             data = response.json()
             if len(data) == 0:
