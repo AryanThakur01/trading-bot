@@ -147,8 +147,6 @@ class Brahmastra(Strategy, Indicators):
                 "Not enough data to calculate Brahmastra exit signal.")
             return 0
         if (self.tradedDirection is not None and df.iloc[-1]['supertrend_dir'] != self.tradedDirection):
-            print(
-                f"Exit signal triggered at {df.iloc[-1]['supertrend_dir']} and {self.tradedDirection}")
             return 1
         return 0
 

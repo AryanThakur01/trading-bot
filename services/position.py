@@ -1,4 +1,5 @@
 from utils.logger import logger
+from datetime import datetime
 import csv
 import os
 import requests
@@ -52,11 +53,12 @@ class Position:
                 f'Back testing mode, not sending order to Binance: {symbol}, {side}, {orderType}, {stopPrice}')
             # Create a new order
             self.activePosition = {
+                'timestamp': datetime.utcnow().isoformat(),
                 'symbol': symbol,
                 'side': side,
                 'orderType': orderType,
                 'stopPrice': stopPrice,
-                'orderPrice': price
+                'orderPrice': price,
             }
             logger.info(
                 f"Created order: Symbol: {symbol}, Side: {side}, OrderType: {orderType}, StopPrice: {stopPrice}, Price: {price}")
@@ -102,6 +104,7 @@ class Position:
                 writer.writeheader()
                 for order in self.orderList:
                     writer.writerow({
+                        'timestamp': order.get('timestamp', ''),
                         'symbol': order.get('symbol', ''),
                         'side': order.get('side', ''),
                         'orderType': order.get('orderType', ''),
