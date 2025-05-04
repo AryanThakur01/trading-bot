@@ -150,10 +150,13 @@ class Brahmastra(Strategy, Indicators):
             return 1
         return 0
 
-    async def crateOrder(self, signal: int, price: float = None):
+    async def createOrder(self, signal: int, dataFrame: pd.DataFrame):
+        price = dataFrame.iloc[-1]['close']
+        timestamp = dataFrame.iloc[-1].name
         if signal == 1:
             self.tradedDirection = 1
             await self.positionService.order(
+                timestamp=timestamp,
                 symbol='btcusdt',
                 side='BUY',
                 stopPrice=self.dataFrame.iloc[-1]['supertrend'] - 200,
@@ -162,6 +165,7 @@ class Brahmastra(Strategy, Indicators):
         elif signal == -1:
             self.tradedDirection = -1
             await self.positionService.order(
+                timestamp=timestamp,
                 symbol='btcusdt',
                 side='SELL',
                 stopPrice=self.dataFrame.iloc[-1]['supertrend'] + 200,
@@ -185,6 +189,6 @@ class Brahmastra(Strategy, Indicators):
             await self.positionService.closePosition(
                 symbol='btcusdt', price=self.dataFrame.iloc[-1]['close'])
         if (calculatedSignal != 0):
-            await self.crateOrder(calculatedSignal, self.dataFrame.iloc[-1]['close'])
+            await self.createOrder(calculatedSignal, self.dataFrame)
 
         self.positionService.exportTradesToCSV()

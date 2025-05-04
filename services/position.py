@@ -31,12 +31,12 @@ class Position:
             print("No PNL")
         return totalPnl
 
-    async def order(self, symbol: str, side: str, stopPrice: float, price: float):
+    async def order(self, timestamp: str, symbol: str, side: str, stopPrice: float, price: float):
         orderType = 'STOP_MARKET'
 
         if settings.isForwardTesting:
             logger.info(
-                f'Forward testing mode, not sending order to Binance: {symbol}, {side}, {orderType}, {stopPrice}')
+                f'Forward testing mode, not sending order to Binance: {timestamp} {symbol}, {side}, {orderType}, {stopPrice}')
             # url = f"{settings.binanceTestingEndpoint}/fapi/v1/order"
             # data = {
             #     'symbol': symbol,
@@ -50,10 +50,10 @@ class Position:
 
         elif settings.isBackTesting:
             logger.debug(
-                f'Back testing mode, not sending order to Binance: {symbol}, {side}, {orderType}, {stopPrice}')
+                f'Back testing mode, not sending order to Binance: {timestamp} {symbol}, {side}, {orderType}, {stopPrice}')
             # Create a new order
             self.activePosition = {
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': timestamp,
                 'symbol': symbol,
                 'side': side,
                 'orderType': orderType,
@@ -94,7 +94,7 @@ class Position:
             logger.warning("No trades to export.")
             return
 
-        fieldnames = ['symbol', 'side', 'orderType',
+        fieldnames = ['timestamp', 'symbol', 'side', 'orderType',
                       'orderPrice', 'stopPrice', 'exitPrice', 'pnl']
 
         try:
