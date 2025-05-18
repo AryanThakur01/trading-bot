@@ -7,6 +7,7 @@ import asyncio
 # from binance.api import getCurrentPrice
 from services.binance.websocket_client import BinanceWebSocketClient
 from services.strategies.brahmastra import Brahmastra
+from services.strategies.ema import EmaCross
 from settings import settings
 
 
@@ -17,7 +18,8 @@ async def main():
     #     time.sleep(5)
 
     # BRAHMASTRA STRATEGY
-    brahmastra = Brahmastra()
+    # brahmastra = Brahmastra()
+    emaCross = EmaCross()
 
     if (settings.isForwardTesting):
         print('Forward testing mode')
@@ -33,15 +35,15 @@ async def main():
             logger.debug(
                 f"[Backtesting{len(data)}] {i}: {time} - {d['k']['c']} - {d['k']['v']}")
 
-            await brahmastra.processKLineData(json.dumps(d))
+            await emaCross.processKLineData(json.dumps(d))
 
             if (i % 288 == 0 and i != 0):
                 print(f"{(i / 288)} day(s) over 5 sec wait")
-                t.sleep(5)
+                t.sleep(1)
     else:
         client = BinanceWebSocketClient("btcusdt", settings.binanceTimeFrame)
         await client.connect()
-        await client.listen(brahmastra.processKLineData)
+        await client.listen(emaCross.processKLineData)
 
 
 if __name__ == "__main__":

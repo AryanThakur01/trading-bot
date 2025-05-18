@@ -51,6 +51,13 @@ class Position:
         elif settings.isBackTesting:
             logger.debug(
                 f'Back testing mode, not sending order to Binance: {timestamp} {symbol}, {side}, {orderType}, {stopPrice}')
+
+            target = price
+            if (side == "BUY"):
+                target = price + (price - stopPrice)*2
+            else:
+                target = price - (stopPrice - price)*2
+
             # Create a new order
             self.activePosition = {
                 'timestamp': timestamp,
@@ -59,6 +66,7 @@ class Position:
                 'orderType': orderType,
                 'stopPrice': stopPrice,
                 'orderPrice': price,
+                'targetPrice': target
             }
             logger.info(
                 f"Created order: Symbol: {symbol}, Side: {side}, OrderType: {orderType}, StopPrice: {stopPrice}, Price: {price}")
@@ -66,6 +74,43 @@ class Position:
         else:
             logger.debug(
                 f'TODO: Implement New order creation in production: {symbol}, {side}, {orderType}, {stopPrice}')
+
+    async def trailSL(self, emaSmaller):
+        if self.activePosition is None:
+            return 0
+        else:
+            self.activePosition["stopPrice"] = emaSmaller
+        return 1
+
+    async def trigger(self, high, low, close):
+        if self.activePosition is None:
+            return 0
+
+        position = self.activePosition
+        side = position['side']
+        stop = position['stopPrice']
+        target = position['targetPrice']
+
+        if side == 'BUY':
+            if low <= stop:
+                logger.warning("BUY stop loss hit")
+                await self.closePosition(position['symbol'], stop)
+                return 1
+            # elif high >= target:
+            #     logger.info("BUY target hit")
+            #     await self.closePosition(position['symbol'], target)
+            #     return 1
+
+        elif side == 'SELL':
+            if high >= stop:
+                logger.warning("SELL stop loss hit")
+                await self.closePosition(position['symbol'], stop)
+                return 1
+            # elif low <= target:
+            #     logger.info("SELL target hit")
+            #     await self.closePosition(position['symbol'], target)
+            #     return 1
+        return 0
 
     async def closePosition(self, symbol: str, price: float):
         if self.activePosition is not None:
@@ -86,23 +131,31 @@ class Position:
             logger.error(
                 f"Closed position: {activePosition} - {len(self.orderList)} orders")
             self.activePosition = None
+            self.exportTradesToCSV()
+            return 1
         else:
             print("No active position to close")
+            return 0
 
     def exportTradesToCSV(self, filename: str = "trades.csv"):
         if not self.orderList:
             logger.warning("No trades to export.")
             return
 
-        fieldnames = ['timestamp', 'symbol', 'side', 'orderType',
-                      'orderPrice', 'stopPrice', 'exitPrice', 'pnl']
+        fieldnames = [
+            'timestamp', 'symbol', 'side', 'orderType',
+            'orderPrice', 'stopPrice', 'exitPrice', 'pnl', 'cumulativePnl'
+        ]
 
         try:
+            cumulativePnl = 0
             with open(filename, mode='w', newline='') as file:
                 writer = csv.DictWriter(file, fieldnames=fieldnames)
-
                 writer.writeheader()
+
                 for order in self.orderList:
+                    pnl = order.get('pnl', 0)
+                    cumulativePnl += pnl
                     writer.writerow({
                         'timestamp': order.get('timestamp', ''),
                         'symbol': order.get('symbol', ''),
@@ -111,8 +164,10 @@ class Position:
                         'orderPrice': order.get('orderPrice', ''),
                         'stopPrice': order.get('stopPrice', ''),
                         'exitPrice': order.get('exitPrice', ''),
-                        'pnl': order.get('pnl', ''),
+                        'pnl': pnl,
+                        'cumulativePnl': cumulativePnl
                     })
+
             logger.info(f"Exported {len(self.orderList)} trades to {filename}")
         except Exception as e:
             logger.exception(f"Failed to export trades to CSV: {e}")

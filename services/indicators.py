@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from settings import settings
 import pandas_ta as ta
 
