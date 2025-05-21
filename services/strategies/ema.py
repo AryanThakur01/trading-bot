@@ -36,8 +36,8 @@ class EmaCross(Strategy, Indicators):
         }
 
     def _appendEMAs(self, df: pd.DataFrame):
-        df["ema_9"] = df["close"].ewm(span=50, adjust=False).mean()
-        df["ema_21"] = df["close"].ewm(span=200, adjust=False).mean()
+        df["ema_small"] = df["close"].ewm(span=50, adjust=False).mean()
+        df["ema_large"] = df["close"].ewm(span=200, adjust=False).mean()
         return df
 
     def appendCandleToDataFrame(self, raw, dataFrame: pd.DataFrame):
@@ -59,25 +59,25 @@ class EmaCross(Strategy, Indicators):
         return kline['k']['x']
 
     def _calculateEmaSignal(self, df: pd.DataFrame):
-        if len(df) < 3 or "ema_9" not in df.columns or "ema_21" not in df.columns:
+        if len(df) < 3 or "ema_small" not in df.columns or "ema_large" not in df.columns:
             logger.warning("Not enough data or missing EMAs.")
             return 0
 
-        ema_9 = df["ema_9"].tolist()
-        ema_21 = df["ema_21"].tolist()
+        ema_small = df["ema_small"].tolist()
+        ema_large = df["ema_large"].tolist()
 
-        if ema_9[-2] < ema_21[-2] and ema_9[-1] > ema_21[-1]:
+        if ema_small[-2] < ema_large[-2] and ema_small[-1] > ema_large[-1]:
             return 1  # Bullish crossover
-        elif ema_9[-2] > ema_21[-2] and ema_9[-1] < ema_21[-1]:
+        elif ema_small[-2] > ema_large[-2] and ema_small[-1] < ema_large[-1]:
             return -1  # Bearish crossover
         return 0
 
     def calculateExitSignal(self, df: pd.DataFrame):
-        if len(df) < 3 or "ema_9" not in df.columns or "ema_21" not in df.columns:
+        if len(df) < 3 or "ema_small" not in df.columns or "ema_large" not in df.columns:
             return 0
-        if self.tradedDirection == 1 and df["ema_9"].iloc[-1] < df["ema_21"].iloc[-1]:
+        if self.tradedDirection == 1 and df["ema_small"].iloc[-1] < df["ema_large"].iloc[-1]:
             return 1
-        if self.tradedDirection == -1 and df["ema_9"].iloc[-1] > df["ema_21"].iloc[-1]:
+        if self.tradedDirection == -1 and df["ema_small"].iloc[-1] > df["ema_large"].iloc[-1]:
             return 1
         return 0
 
@@ -115,27 +115,15 @@ class EmaCross(Strategy, Indicators):
         await self.positionService.trigger(
             data["k"]["h"], data["k"]["l"], data["k"]["c"])
 
-        if "ema_9" in self.dataFrame.columns:
-            print(self.dataFrame.iloc[-1]["ema_9"])
-            await self.positionService.trailSL(self.dataFrame.iloc[-1]["ema_21"])
-
-        # if (exited > 1):
-        #     self.wait = 10
-        #     return
-        #
-        # if (self.wait > 0):
-        #     logger.info('COOLDOWN.....')
-        #     self.wait = self.wait - 1
-        #     return
+        # if "ema_small" in self.dataFrame.columns:
+        #     print(self.dataFrame.iloc[-1]["ema_small"])
+        #     await self.positionService.trailSL(self.dataFrame.iloc[-1]["ema_large"])
 
         calculatedSignal = self._calculateEmaSignal(self.dataFrame.tail(3))
         if self.calculateExitSignal(self.dataFrame):
-            # closed =
             await self.positionService.closePosition(
                 symbol="btcusdt", price=self.dataFrame.iloc[-1]["close"]
             )
-            # if (closed == 1):
-            #     self.wait = 10
 
         if calculatedSignal != 0:
             await self.createOrder(calculatedSignal, self.dataFrame)

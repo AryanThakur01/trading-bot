@@ -9,6 +9,7 @@ from services.binance.websocket_client import BinanceWebSocketClient
 from services.strategies.brahmastra import Brahmastra
 from services.strategies.ema import EmaCross
 from settings import settings
+from services.cache_manager import CacheManager
 
 
 async def main():
@@ -20,13 +21,20 @@ async def main():
     # BRAHMASTRA STRATEGY
     # brahmastra = Brahmastra()
     emaCross = EmaCross()
+    cacheManager = CacheManager()
 
     if (settings.isForwardTesting):
         print('Forward testing mode')
         pass
     elif (settings.isBackTesting):
-        data = getHistoricalData(symbol='BTCUSDT',
-                                 interval=settings.binanceTimeFrame, limit=settings.backtestingCandleLimit)
+        dataCache = cacheManager.load('BTCUSDT', settings.startDate, settings.binanceTimeFrame,
+                                      settings.backtestingCandleLimit, settings.maxCandles)
+        data = dataCache if dataCache is not None else getHistoricalData(symbol='BTCUSDT',
+                                                                         interval=settings.binanceTimeFrame, limit=settings.backtestingCandleLimit)
+        if (dataCache is None):
+            cacheManager.save(data, 'BTCUSDT', settings.startDate, settings.binanceTimeFrame,
+                              settings.backtestingCandleLimit, settings.maxCandles)
+
         for i in range(len(data)):
             d = data[i]
             time = pd.to_datetime(

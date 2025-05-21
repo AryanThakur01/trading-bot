@@ -18,6 +18,7 @@ class Config:
     startDate: str
     isBackTesting: bool
     backtestingCandleLimit: int
+    maxCandles: int
 
     isForwardTesting: bool
     binanceTestingEndpoint: str
@@ -38,6 +39,9 @@ settings = Config(
     ),
     supertrendPeriod=eval(
         os.getenv("SUPERTREND_PERIOD", '20')
+    ),
+    maxCandles=eval(
+        os.getenv("MAX_CANDLES", '-1')
     ),
     minDataFrameLen=eval(
         os.getenv("MIN_DATA_FRAME_LEN", '50')
