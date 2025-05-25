@@ -1,7 +1,9 @@
 from fastapi import APIRouter
 from app.api import health
+from app.settings import settings
 
 router = APIRouter()
 
 # Include all routers
-router.include_router(health.router, prefix="/health", tags=["Health"])
+if settings.ENVIRONMENT == "development":
+    router.include_router(health.router, prefix="/health", tags=["Health"])
