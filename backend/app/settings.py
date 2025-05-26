@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str
     BINANCE_API_KEY: str
     BINANCE_SECRET: str
+    DATABASE_URI: str
 
     class Config:
         env_file = ".env"
