@@ -1,5 +1,3 @@
-[tool.pyright]
-typeCheckingMode = "strict"
-reportMissingImports = true
-reportOptionalSubscript = true
-reportOptionalMemberAccess = true
+[tool.ruff]
+line-length = 80
+select = ["ALL"]
