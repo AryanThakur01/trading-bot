@@ -30,7 +30,7 @@ class Config:
 
 
 settings = Config(
-    unitTradeSize=eval(os.getenv("UNIT_TRADE_SIZE", '0.001')),
+    unitTradeSize=eval(os.getenv("UNIT_TRADE_SIZE")),
     symbol=os.getenv("SYMBOL", "BTCUSDT"),
     trailSLMultiplier=eval(os.getenv("TRAIL_SL_MULTIPLIER", '1.5')),
     currentATR=eval(os.getenv("CURRENT_ATR", '0.0')),

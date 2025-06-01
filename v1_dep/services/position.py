@@ -20,6 +20,7 @@ class Trade:
     side:       Side
     orderType:  Literal["STOP_MARKET", "LIMIT"]
     pnl:        float
+    totalRisk:  float = 0.0
 
     sl:         float
     tp:         Optional[float]
@@ -66,6 +67,12 @@ class Position:
             raise ValueError(f"Symbol {symbol} not found in min sizes.")
         return size
 
+    def printActivePosition(self):
+        if not self.activePosition:
+            return
+        for key, value in self.activePosition.items():
+            print(f"\t{key}: {value}")
+
     async def open_position(self, symbol: str, side: Side, price: float, atr: float, entry_time: datetime):
         if self.activePosition:
             logger.warning("Position already open, cannot open a new one.")
@@ -80,9 +87,10 @@ class Position:
         elif balance <= 0:
             raise ValueError("Insufficient balance to open a position.")
         elif qty * price > balance:
-            logger.warn(f"Position size {qty} exceeds available balance {balance}. No Position opened.")
+            logger.warn(f"Position size {qty} of value {qty*price} exceeds available balance {balance}. No Position opened.")
             return
 
+        sl = price - (atr * settings.trailSLMultiplier) if side == "BUY" else price + (atr * settings.trailSLMultiplier)
         self.activePosition = {
             'timestamp': entry_time,
             'qty': qty,
@@ -90,14 +98,16 @@ class Position:
             'side': side,
             'orderType': 'STOP_MARKET',
             'pnl': 0.0,
+            'totalRisk': (sl - price if side == "BUY" else price - sl) * qty,
 
-            'sl': price - (atr * settings.trailSLMultiplier) if side == "BUY" else price + (atr * settings.trailSLMultiplier),
+            'sl': sl,
             'tp': price + ((atr * settings.trailSLMultiplier) if side == "BUY" else -(atr * settings.trailSLMultiplier))*2,
             'bookedHalfTpProfit': False,
             'bookedFullTpProfit': False,
             'exit': []
         }
-        logger.info(f"Opened position: {self.activePosition}")
+        logger.info("Position opened: ")
+        self.printActivePosition()
 
     async def sl_ticker(self, open: float, high: float, low: float, close: float):
         if not self.activePosition:
@@ -105,11 +115,9 @@ class Position:
 
         if self.activePosition['side'] == "BUY":
             if low <= self.activePosition['sl']:
-                logger.info(f"Stop loss hit for position: {self.activePosition}")
                 await self.close_position(exit_price=self.activePosition['sl'])
         elif self.activePosition['side'] == "SELL":
             if high >= self.activePosition['sl']:
-                logger.info(f"Stop loss hit for position: {self.activePosition}")
                 await self.close_position(exit_price=self.activePosition['sl'])
 
     async def tp_ticker(self, open: float, high: float, low: float, close: float):
@@ -119,24 +127,20 @@ class Position:
         half_profit = (self.activePosition['tp'] - self.activePosition['entry']) / 2 + self.activePosition['entry']
 
         if self.activePosition['side'] == "BUY":
-            if not self.activePosition['bookedHalfTpProfit']:
-                logger.info(f"Moving SL to entry price for position: {self.activePosition}")
+            if not self.activePosition['bookedHalfTpProfit'] and high >= half_profit:
                 self.activePosition['sl'] = self.activePosition['entry']
                 await self.close_position(exit_price=half_profit, exit_size=self.activePosition['qty'] / 3)
                 self.activePosition['bookedHalfTpProfit'] = True
-            elif not self.activePosition['bookedFullTpProfit']:
-                logger.info(f"Take profit hit for position: {self.activePosition}")
+            elif not self.activePosition['bookedFullTpProfit'] and high >= self.activePosition['tp']:
                 self.activePosition['sl'] = half_profit
                 await self.close_position(exit_price=self.activePosition['tp'], exit_size=self.activePosition['qty'] * 1 / 2)
                 self.activePosition['bookedFullTpProfit'] = True
         elif self.activePosition['side'] == "SELL":
-            if not self.activePosition['bookedHalfTpProfit']:
-                logger.info(f"Moving SL to entry price for position: {self.activePosition}")
+            if not self.activePosition['bookedHalfTpProfit'] and low <= half_profit:
                 self.activePosition['sl'] = self.activePosition['entry']
                 await self.close_position(exit_price=half_profit, exit_size=self.activePosition['qty'] / 3)
                 self.activePosition['bookedHalfTpProfit'] = True
-            elif not self.activePosition['bookedFullTpProfit']:
-                logger.info(f"Take profit hit for position: {self.activePosition}")
+            elif not self.activePosition['bookedFullTpProfit'] and low <= self.activePosition['tp']:
                 self.activePosition['sl'] = half_profit
                 await self.close_position(exit_price=self.activePosition['tp'], exit_size=self.activePosition['qty'] * 1 / 2)
                 self.activePosition['bookedFullTpProfit'] = True
@@ -144,10 +148,6 @@ class Position:
     async def position_ticker(self, open:float, high: float, low: float, close: float):
         if not self.activePosition:
             return
-
-        print(f"Exits for active position {self.activePosition['entry']}:")
-        for exit in self.activePosition['exit']:
-            print(f"Exit: {exit['price']} | {exit['qty']}")
 
         await self.sl_ticker(open, high, low, close)
         await self.tp_ticker(open, high, low, close)
@@ -179,11 +179,13 @@ class Position:
         self.activePosition['qty'] -= exit_size
 
         if (self.activePosition['qty'] <= 0):
-            logger.info(f"Closed position: {self.activePosition}")
+            logger.info("Closed position: ")
+            self.printActivePosition()
             self.orderList.append(self.activePosition)
             self.activePosition = None
         else:
-            logger.info(f"Partial close: {exit_size} qty at {exit_price}, remaining qty: {self.activePosition['qty']}")
+            logger.info("Partial close: ")
+            self.printActivePosition()
 
     def format_exits(self, exits: list[Exit]) -> str:
         if not exits:
@@ -208,6 +210,7 @@ class Position:
                     cumulativePnl += pnl
                     writer.writerow({
                         'timestamp': order.get('timestamp', ''),
+                        'totalRisk': order.get('totalRisk', ''),
                         'qty': order.get('qty', ''),
                         'entry': order.get('entry', ''),
                         'exit': self.format_exits(order.get('exit', [])),
@@ -218,7 +221,7 @@ class Position:
                         'sl': order.get('sl', ''),
                         'tp': order.get('tp', '')
                     })
-            logger.info(f"Exported {len(self.orderList)} trades to {filename}")
+            print(f"Exported {len(self.orderList)} trades to {filename}")
 
         except Exception as e:
             logger.exception(f"Failed to export trades to CSV: {e}")
