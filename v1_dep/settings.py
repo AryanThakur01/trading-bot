@@ -7,6 +7,10 @@ load_dotenv()
 
 @dataclass
 class Config:
+    symbol: str
+    unitTradeSize: float
+    trailSLMultiplier: float
+    currentATR: float
     binanceEndpoint: str
     binanceWSSEndpoint: str
     timeZoneOffsetms: int
@@ -26,6 +30,10 @@ class Config:
 
 
 settings = Config(
+    unitTradeSize=eval(os.getenv("UNIT_TRADE_SIZE", '0.001')),
+    symbol=os.getenv("SYMBOL", "BTCUSDT"),
+    trailSLMultiplier=eval(os.getenv("TRAIL_SL_MULTIPLIER", '1.5')),
+    currentATR=eval(os.getenv("CURRENT_ATR", '0.0')),
     binanceEndpoint=os.getenv("BINANCE_ENDPOINT", "https://api.binance.com/"),
     binanceWSSEndpoint=os.getenv(
         "BINANCE_WSS_ENDPOINT", "wss://stream.binance.com:9443/ws"),

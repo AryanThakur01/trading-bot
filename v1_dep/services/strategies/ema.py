@@ -35,9 +35,10 @@ class EmaCross(Strategy, Indicators):
             "volume": float(kline["v"]),
         }
 
-    def _appendEMAs(self, df: pd.DataFrame):
+    def _appendIndicators(self, df: pd.DataFrame):
         df["ema_small"] = df["close"].ewm(span=50, adjust=False).mean()
         df["ema_large"] = df["close"].ewm(span=200, adjust=False).mean()
+        df["atr"] = ta.atr(df["high"], df["low"], df["close"], length=14)
         return df
 
     def appendCandleToDataFrame(self, raw, dataFrame: pd.DataFrame):
@@ -51,7 +52,7 @@ class EmaCross(Strategy, Indicators):
             dataFrame = pd.concat([dataFrame, newRow])
 
         if len(dataFrame) >= settings.minDataFrameLen:
-            dataFrame = self._appendEMAs(dataFrame)
+            dataFrame = self._appendIndicators(dataFrame)
 
         return dataFrame
 
@@ -82,48 +83,42 @@ class EmaCross(Strategy, Indicators):
         return 0
 
     async def createOrder(self, signal: int, df: pd.DataFrame):
+        atr = df.iloc[-1]["atr"] if "atr" in df.columns else 0.0
         price = df.iloc[-1]["close"]
         timestamp = df.iloc[-1].name
-        if signal == 1:
-            self.tradedDirection = 1
-            await self.positionService.order(
-                timestamp=timestamp,
-                symbol="btcusdt",
-                side="BUY",
-                stopPrice=price * 0.98,
-                price=price,
-            )
-        elif signal == -1:
-            self.tradedDirection = -1
-            await self.positionService.order(
-                timestamp=timestamp,
-                symbol="btcusdt",
-                side="SELL",
-                stopPrice=price * 1.02,
-                price=price,
-            )
+        self.tradedDirection = signal
+        await self.positionService.open_position(
+            symbol=settings.symbol,
+            side="BUY" if signal == 1 else "SELL",
+            price=price,
+            atr=atr,
+            entry_time=timestamp,
+        )
 
     async def processKLineData(self, message):
         data = json.loads(message)
         if not self.isCandleClosed(data):
             return
 
-        self.positionService.getTotalPNL()
         self.dataFrame = self.appendCandleToDataFrame(
             data["k"], self.dataFrame)
-
-        await self.positionService.trigger(
-            data["k"]["h"], data["k"]["l"], data["k"]["c"])
-
-        # if "ema_small" in self.dataFrame.columns:
-        #     print(self.dataFrame.iloc[-1]["ema_small"])
-        #     await self.positionService.trailSL(self.dataFrame.iloc[-1]["ema_large"])
+        await self.positionService.position_ticker(
+            open=self.dataFrame.iloc[-1]["open"],
+            high=self.dataFrame.iloc[-1]["high"],
+            low=self.dataFrame.iloc[-1]["low"],
+            close=self.dataFrame.iloc[-1]["close"]
+        )
 
         calculatedSignal = self._calculateEmaSignal(self.dataFrame.tail(3))
         if self.calculateExitSignal(self.dataFrame):
-            await self.positionService.closePosition(
-                symbol="btcusdt", price=self.dataFrame.iloc[-1]["close"]
+            await self.positionService.close_position(
+                exit_price=self.dataFrame.iloc[-1]["close"]
             )
+            pass
 
         if calculatedSignal != 0:
             await self.createOrder(calculatedSignal, self.dataFrame)
+
+        self.positionService.export_to_csv(settings.symbol+'_trades.csv')
+
+        await self.positionService.get_total_pnl()

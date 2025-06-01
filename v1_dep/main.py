@@ -27,12 +27,12 @@ async def main():
         print('Forward testing mode')
         pass
     elif (settings.isBackTesting):
-        dataCache = cacheManager.load('BTCUSDT', settings.startDate, settings.binanceTimeFrame,
+        dataCache = cacheManager.load(settings.symbol, settings.startDate, settings.binanceTimeFrame,
                                       settings.backtestingCandleLimit, settings.maxCandles)
-        data = dataCache if dataCache is not None else getHistoricalData(symbol='BTCUSDT',
+        data = dataCache if dataCache is not None else getHistoricalData(symbol=settings.symbol,
                                                                          interval=settings.binanceTimeFrame, limit=settings.backtestingCandleLimit)
         if (dataCache is None):
-            cacheManager.save(data, 'BTCUSDT', settings.startDate, settings.binanceTimeFrame,
+            cacheManager.save(data, settings.symbol, settings.startDate, settings.binanceTimeFrame,
                               settings.backtestingCandleLimit, settings.maxCandles)
 
         for i in range(len(data)):
@@ -49,7 +49,7 @@ async def main():
                 print(f"{(i / 288)} day(s) over 5 sec wait")
                 t.sleep(1)
     else:
-        client = BinanceWebSocketClient("btcusdt", settings.binanceTimeFrame)
+        client = BinanceWebSocketClient(settings.symbol, settings.binanceTimeFrame)
         await client.connect()
         await client.listen(emaCross.processKLineData)
 
